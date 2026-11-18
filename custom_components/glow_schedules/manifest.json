@@ -1,0 +1,14 @@
+{
+  "domain": "glow_schedules",
+  "name": "Glow Schedules",
+  "codeowners": ["@stijnleroy"],
+  "config_flow": true,
+  "dependencies": ["websocket_api"],
+  "documentation": "https://github.com/stijnleroy/glow-schedules",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/stijnleroy/glow-schedules/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}

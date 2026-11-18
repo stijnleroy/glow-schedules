@@ -1,0 +1,101 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Glow Schedules",
+        "description": "Schedules that follow your shift. Which shift do you have this week? It then alternates every Monday.",
+        "data": {
+          "this_week": "Shift this week",
+          "weekend_free": "Weekend is always off",
+          "restore": "Restore the right state after a restart"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Glow Schedules is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Glow Schedules",
+        "data": {
+          "weekend_free": "Weekend is always off",
+          "restore": "Restore the right state after a restart"
+        }
+      }
+    }
+  },
+  "selector": {
+    "shift": {
+      "options": {
+        "early": "Early shift",
+        "late": "Late shift",
+        "free": "Day off"
+      }
+    },
+    "shift_auto": {
+      "options": {
+        "early": "Early shift",
+        "late": "Late shift",
+        "free": "Day off",
+        "auto": "Follow the pattern"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "shift": {
+        "name": "Shift",
+        "state": {
+          "early": "Early shift",
+          "late": "Late shift",
+          "free": "Day off"
+        }
+      }
+    },
+    "switch": {
+      "vacation": {
+        "name": "Vacation"
+      }
+    }
+  },
+  "services": {
+    "set_day_shift": {
+      "name": "Shift of a day",
+      "description": "Set the shift of one day, e.g. after a swap. 'Follow the pattern' undoes it.",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Empty = today."
+        },
+        "shift": {
+          "name": "Shift",
+          "description": ""
+        }
+      }
+    },
+    "swap_week": {
+      "name": "Swap week",
+      "description": "Flip the shift pattern from this week on."
+    },
+    "set_vacation": {
+      "name": "Vacation",
+      "description": "Run every day as a day off.",
+      "fields": {
+        "on": {
+          "name": "On",
+          "description": ""
+        },
+        "from": {
+          "name": "From",
+          "description": ""
+        },
+        "until": {
+          "name": "Until",
+          "description": ""
+        }
+      }
+    }
+  }
+}

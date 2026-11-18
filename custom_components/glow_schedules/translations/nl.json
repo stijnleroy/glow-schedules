@@ -1,0 +1,101 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Glow Schedules",
+        "description": "Schema's die je ploeg volgen. Welke ploeg heb je deze week? Daarna wisselt het elke maandag vanzelf.",
+        "data": {
+          "this_week": "Ploeg deze week",
+          "weekend_free": "Weekend is altijd vrij",
+          "restore": "Na een herstart de juiste toestand herstellen"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Glow Schedules is al ingesteld."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Glow Schedules",
+        "data": {
+          "weekend_free": "Weekend is altijd vrij",
+          "restore": "Na een herstart de juiste toestand herstellen"
+        }
+      }
+    }
+  },
+  "selector": {
+    "shift": {
+      "options": {
+        "early": "Vroege ploeg",
+        "late": "Late ploeg",
+        "free": "Vrij"
+      }
+    },
+    "shift_auto": {
+      "options": {
+        "early": "Vroege ploeg",
+        "late": "Late ploeg",
+        "free": "Vrij",
+        "auto": "Volgens het patroon"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "shift": {
+        "name": "Ploeg",
+        "state": {
+          "early": "Vroege ploeg",
+          "late": "Late ploeg",
+          "free": "Vrij"
+        }
+      }
+    },
+    "switch": {
+      "vacation": {
+        "name": "Vakantie"
+      }
+    }
+  },
+  "services": {
+    "set_day_shift": {
+      "name": "Ploeg van een dag",
+      "description": "Zet de ploeg van één dag, bv. bij een ruil. 'Volgens het patroon' maakt dat ongedaan.",
+      "fields": {
+        "date": {
+          "name": "Datum",
+          "description": "Leeg = vandaag."
+        },
+        "shift": {
+          "name": "Ploeg",
+          "description": ""
+        }
+      }
+    },
+    "swap_week": {
+      "name": "Week omwisselen",
+      "description": "Draai het ploegpatroon om vanaf deze week."
+    },
+    "set_vacation": {
+      "name": "Vakantie",
+      "description": "Alle dagen als vrije dag laten lopen.",
+      "fields": {
+        "on": {
+          "name": "Aan",
+          "description": ""
+        },
+        "from": {
+          "name": "Vanaf",
+          "description": ""
+        },
+        "until": {
+          "name": "Tot en met",
+          "description": ""
+        }
+      }
+    }
+  }
+}

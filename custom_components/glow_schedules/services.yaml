@@ -1,0 +1,24 @@
+set_day_shift:
+  fields:
+    date:
+      selector:
+        date:
+    shift:
+      required: true
+      selector:
+        select:
+          translation_key: shift_auto
+          options: ["early", "late", "free", "auto"]
+swap_week:
+set_vacation:
+  fields:
+    "on":
+      required: true
+      selector:
+        boolean:
+    from:
+      selector:
+        date:
+    until:
+      selector:
+        date:
