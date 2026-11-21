@@ -134,3 +134,45 @@ async def test_config_flow(hass: HomeAssistant):
     assert hass.states.get("sensor.glow_schedules_shift") is not None
     r = await hass.config_entries.flow.async_init("glow_schedules", context={"source": config_entries.SOURCE_USER})
     assert r["type"] == "abort"
+
+
+async def test_manual_override_until_next_block(hass: HomeAssistant, hass_ws_client, freezer):
+    entry, calls, on, off, ws = await _setup(hass, freezer, hass_ws_client)
+    await ws.send_json({"id": 1, "type": "glow_schedules/save", "schedule": HEAT})
+    res = await ws.receive_json()
+    sid = res["result"]["id"]
+    await hass.async_block_till_done()
+    assert calls[-1].data["temperature"] == 17.0
+    n = len(calls)
+
+    # iemand zet de thermostaat met de hand hoger (na de wachttijd van 2 minuten)
+    freezer.move_to(datetime(2026, 11, 18, 12, 5, tzinfo=TZ))
+    hass.states.async_set("climate.living", "heat", {"temperature": 22})
+    await hass.async_block_till_done()
+    await ws.send_json({"id": 2, "type": "glow_schedules/get"})
+    res = await ws.receive_json()
+    assert res["result"]["schedules"][0]["manual"] is True
+
+    # een waarde-entiteit verandert: tijdens het bijsturen niet opnieuw toepassen
+    hass.states.async_set("input_number.eco", "16")
+    await hass.async_block_till_done()
+    assert len(calls) == n
+
+    # volgend blok: schema neemt het weer over
+    freezer.move_to(datetime(2026, 11, 18, 15, 30, tzinfo=TZ))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert calls[-1].data["temperature"] == 21.0
+    await ws.send_json({"id": 3, "type": "glow_schedules/get"})
+    res = await ws.receive_json()
+    assert res["result"]["schedules"][0]["manual"] is False
+
+    # opnieuw bijsturen en dan "terug naar schema"
+    freezer.move_to(datetime(2026, 11, 18, 16, 0, tzinfo=TZ))
+    hass.states.async_set("climate.living", "off", {"temperature": 22})
+    await hass.async_block_till_done()
+    await ws.send_json({"id": 4, "type": "glow_schedules/apply", "schedule_id": sid})
+    res = await ws.receive_json()
+    assert res["success"], res
+    await hass.async_block_till_done()
+    assert calls[-1].data["temperature"] == 21.0

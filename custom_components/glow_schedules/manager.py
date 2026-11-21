@@ -1,13 +1,14 @@
 """Het hart van Glow Schedules: opslag, ploegen en het uitvoeren van de schema's."""
 from __future__ import annotations
 
+from collections import deque
 from datetime import date, datetime, timedelta
 import logging
 from typing import Any
 import uuid
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import CoreState, Event, HomeAssistant, callback
+from homeassistant.core import Context, CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.helpers.storage import Store
@@ -34,6 +35,10 @@ class ScheduleManager:
         self._applied: dict[str, engine.Segment] = {}
         self._unsubs: list = []
         self._value_unsub = None
+        self._target_unsub = None
+        self._ctx: deque[str] = deque(maxlen=64)  # contexten van onze eigen acties
+        self.overrides: dict[str, str] = {}  # schema → stuk waarin iemand met de hand bijstuurde
+        self._acted: dict[str, datetime] = {}  # wanneer wij een toestel het laatst bedienden
         self._sun_cache: dict[tuple[str, date], int | None] = {}
 
     # ------------------------------------------------------------ opslag
@@ -56,6 +61,12 @@ class ScheduleManager:
         self.revision += 1
         self._store.async_delay_save(self._data, 1)
         self._track_values()
+        self._track_targets()
+        async_dispatcher_send(self.hass, SIGNAL_UPDATE)
+
+    def _bump(self) -> None:
+        """Iets veranderd dat niet bewaard moet worden (bv. met de hand bijgestuurd)."""
+        self.revision += 1
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
 
     # ------------------------------------------------------------ starten en stoppen
@@ -63,6 +74,7 @@ class ScheduleManager:
     async def async_start(self) -> None:
         self._unsubs.append(async_track_time_change(self.hass, self._tick, second=0))
         self._track_values()
+        self._track_targets()
 
         async def _started(_: Event | None = None) -> None:
             # na een herstart de juiste toestand meteen herstellen
@@ -80,6 +92,9 @@ class ScheduleManager:
         if self._value_unsub:
             self._value_unsub()
             self._value_unsub = None
+        if self._target_unsub:
+            self._target_unsub()
+            self._target_unsub = None
         await self._store.async_save(self._data())
 
     # ------------------------------------------------------------ hulpjes
@@ -135,6 +150,8 @@ class ScheduleManager:
                 self._applied[sid] = seg
                 continue
             self._applied[sid] = seg
+            if self.overrides.pop(sid, None) is not None:
+                self.revision += 1
             await self._run(s, seg)
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
 
@@ -144,8 +161,12 @@ class ScheduleManager:
             if ent and self.hass.states.get(ent) is None:
                 _LOGGER.warning("Schema %s: %s bestaat niet", s["name"], ent)
                 continue
+            ctx = Context()
+            self._ctx.append(ctx.id)
+            if ent:
+                self._acted[ent] = dt_util.utcnow()
             try:
-                await self.hass.services.async_call(domain, service, data, blocking=True)
+                await self.hass.services.async_call(domain, service, data, blocking=True, context=ctx)
             except Exception as err:  # noqa: BLE001 - één fout mag de rest niet tegenhouden
                 _LOGGER.error("Schema %s: %s.%s mislukt: %s", s["name"], domain, service, err)
 
@@ -167,9 +188,60 @@ class ScheduleManager:
         @callback
         def _changed(event: Event) -> None:
             for sid in ents.get(event.data["entity_id"], []):
+                if sid in self.overrides:
+                    continue
                 self.hass.async_create_task(self.async_evaluate(force=True, only=sid))
 
         self._value_unsub = async_track_state_change_event(self.hass, list(ents), _changed)
+
+    def _track_targets(self) -> None:
+        """Stuurt iemand een toestel met de hand bij, dan blijft dat zo tot het volgende blok."""
+        ents: dict[str, list[str]] = {}
+        for sid, s in self.schedules.items():
+            for t in s.get("targets") or []:
+                ents.setdefault(t, []).append(sid)
+        if self._target_unsub:
+            self._target_unsub()
+            self._target_unsub = None
+        if not ents:
+            return
+
+        @callback
+        def _changed(event: Event) -> None:
+            old, new = event.data.get("old_state"), event.data.get("new_state")
+            if old is None or new is None or new.state in ("unavailable", "unknown") or old.state in ("unavailable", "unknown"):
+                return
+            ctx = event.context
+            if ctx.id in self._ctx or (ctx.parent_id and ctx.parent_id in self._ctx):
+                return
+            # cloudtoestellen (bv. Nest) melden onze eigen opdracht soms later en zonder context
+            acted = self._acted.get(event.data["entity_id"])
+            if acted and dt_util.utcnow() - acted < timedelta(seconds=120):
+                return
+            # alleen echte bediening telt, geen gemeten waarden
+            keys = ("temperature", "target_temp_low", "target_temp_high", "brightness", "current_position")
+            if old.state == new.state and all(old.attributes.get(k) == new.attributes.get(k) for k in keys):
+                return
+            changed = False
+            for sid in ents.get(event.data["entity_id"], []):
+                s = self.schedules.get(sid)
+                seg = self._applied.get(sid)
+                if not s or not s.get("enabled", True) or seg is None or self.overrides.get(sid) == seg.key:
+                    continue
+                self.overrides[sid] = seg.key
+                changed = True
+            if changed:
+                self._bump()
+
+        self._target_unsub = async_track_state_change_event(self.hass, list(ents), _changed)
+
+    async def async_apply(self, sid: str) -> None:
+        """Terug naar het schema: het huidige blok (of de stand erbuiten) meteen toepassen."""
+        if sid not in self.schedules:
+            raise KeyError(sid)
+        self.overrides.pop(sid, None)
+        self._bump()
+        await self.async_evaluate(only=sid, force=True)
 
     # ------------------------------------------------------------ schema's beheren
 
@@ -196,6 +268,7 @@ class ScheduleManager:
         if s is None:
             raise KeyError(sid)
         s["enabled"] = bool(enabled)
+        self.overrides.pop(sid, None)
         self._applied.pop(sid, None)
         self._changed()
         if enabled:
@@ -256,6 +329,7 @@ class ScheduleManager:
             **s,
             "week": days,
             "now": {"inside": seg.inside, "value": seg.value, "start": seg.start, "end": seg.end, "variant": seg.variant},
+            "manual": s["id"] in self.overrides,
             "next": nxt.isoformat() if nxt else None,
         }
 

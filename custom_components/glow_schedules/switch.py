@@ -117,6 +117,7 @@ class ScheduleSwitch(_Base):
             "targets": s["targets"],
             "variant": d["now"]["variant"],
             "active": d["now"]["inside"] and s.get("enabled", True),
+            "manual": d["manual"],
             "today": today["blocks"] if today else [],
             "next_change": d["next"],
         }

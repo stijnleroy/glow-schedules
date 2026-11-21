@@ -11,6 +11,7 @@ Schedules for Home Assistant that follow your shift work: **early shift**, **lat
 - **Schedules per shift or the same every day.** Times can follow sunrise or sunset (`sunset+30`).
 - **What happens outside the blocks**: off, nothing, or a value (e.g. eco temperature 17 °C).
 - **Values from helpers**: a block can take its temperature from an `input_number`, so changing the comfort temperature applies at once.
+- **Manual changes win until the next block**: turn the heating up or a light off by hand, and the schedule leaves it until its next block starts. `glow_schedules/apply` (the card's *Schedule* button) goes back to the schedule right away.
 - **Restore after a restart**: after Home Assistant restarts, every schedule puts its devices in the right state.
 - Runs entirely inside Home Assistant; no cloud.
 
@@ -51,6 +52,7 @@ Schema's voor Home Assistant die je ploegen volgen: **vroege ploeg**, **late plo
 - **Per ploeg of elke dag hetzelfde**, ook met zonsopgang of zonsondergang (`sunset+30`).
 - **Buiten de blokken**: uit, niets doen, of een waarde (bv. spaarstand 17 °C).
 - **Waarden uit helpers**: de temperatuur van een blok kan uit een `input_number` komen. Pas je de comforttemperatuur aan, dan geldt die meteen.
+- **Met de hand bijsturen geldt tot het volgende blok.** Daarna neemt het schema het weer over, of meteen met de knop *Schema* op de kaart.
 - **Na een herstart** zet elk schema zijn toestellen meteen goed.
 - Alles draait in Home Assistant zelf, zonder cloud.
 

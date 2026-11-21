@@ -23,6 +23,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_save)
     websocket_api.async_register_command(hass, ws_delete)
     websocket_api.async_register_command(hass, ws_enable)
+    websocket_api.async_register_command(hass, ws_apply)
     websocket_api.async_register_command(hass, ws_shift)
 
 
@@ -71,6 +72,20 @@ async def ws_enable(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         return _not_ready(connection, msg)
     try:
         await mgr.async_set_enabled(msg["schedule_id"], msg["enabled"])
+    except KeyError:
+        connection.send_error(msg["id"], "not_found", "Unknown schedule")
+        return
+    connection.send_result(msg["id"], {})
+
+
+@websocket_api.websocket_command({vol.Required("type"): "glow_schedules/apply", vol.Required("schedule_id"): str})
+@websocket_api.async_response
+async def ws_apply(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    mgr = _mgr(hass)
+    if mgr is None:
+        return _not_ready(connection, msg)
+    try:
+        await mgr.async_apply(msg["schedule_id"])
     except KeyError:
         connection.send_error(msg["id"], "not_found", "Unknown schedule")
         return
